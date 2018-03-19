@@ -1,5 +1,5 @@
 from ereuse_utils import ensure_utf8
-from flask import Flask
+from flask import Flask, render_template
 from werkzeug.exceptions import NotFound
 
 
@@ -10,6 +10,7 @@ class DesktopApp(Flask):
         ensure_utf8(self.__class__.__name__)
         super().__init__(import_name, static_path, static_url_path, static_folder, template_folder,
                          instance_path, instance_relative_config, root_path)
+        self.add_url_rule('/', view_func=self.view_default, methods={'GET'})
         self.add_url_rule('/info', view_func=self.view_info, methods={'GET'})
         self.add_url_rule('/workbench', view_func=self.view_workbench, methods={'POST'})
 
@@ -18,3 +19,8 @@ class DesktopApp(Flask):
 
     def view_workbench(self):
         """Execute workbench and returns the result."""
+
+
+    def view_default(self):
+        """Import template index.html"""
+        return render_template('index.html', foo='foo-bar')
