@@ -20,7 +20,7 @@ class DesktopApp(Flask):
     def view_workbench(self):
         """Execute workbench and returns the result."""
 
-
     def view_default(self):
         """Import template index.html"""
-        return render_template('index.html', foo='foo-bar')
+        return render_template('extends.html', name='init')
+        # return render_template('index.html', foo='foo-bar')

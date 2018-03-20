@@ -2,11 +2,12 @@
 <html lang="en">
 <head>
     {% block head %}
-    <link rel="stylesheet" href="css/style.css" />
-    <title>{% block title %} My eReuse.org & Support {% endblock %} </title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" >
+    <title>{% block title %} eReuse.org Info & Support {% endblock %} </title>
     {% endblock %}
 </head>
 <body>
+    <h1 id="title"> eReuse.org Info & Support </h1>
     <div id="content"> {% block content %} {% endblock %} </div>
     <div id="footer">
         {% block footer %}
