@@ -1,14 +1,19 @@
-body    { font-family: sans-serif; background: #dddddd; }
+body    {
+    font-family: sans-serif;
+    background: #dddddd;
+}
 
 h1, h2  { font-family: 'Georgia', serif; margin: 0; color: #1d331a; }
 
-h1  { border-bottom: 2px solid #eee; }
+h1 {font-size: 1.5em}
 
 h2  {font-size: 1.2em; }
 
 iframe {
     margin-top: 2em;
-    height: 70%;
+    margin-bottom: 2em;
+    /* height =  100vh - iframe margin top - h1 */
+    height: calc(100vh - 4em - 1.5em);
     width: 100%;
 }
 
