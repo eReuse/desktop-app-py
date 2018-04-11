@@ -1,12 +1,9 @@
-from threading import Timer, Thread
-from time import sleep
-
+from threading import Thread
 from ereuse_utils import ensure_utf8
 from ereuse_workbench.workbench import Workbench
 from flask import Flask, render_template, jsonify, json, request, Response
-from multiprocessing import Process, Queue
+from multiprocessing import Queue
 from werkzeug.exceptions import NotFound
-import sched
 
 
 class DesktopApp(Flask):
@@ -29,9 +26,8 @@ class DesktopApp(Flask):
         self.workbench_thread.run()
         # todo get info from devicehub
         # if last event has been a while ago
-        if last_event_while_ago:
-            self.workbench_queue.put(None)
-
+        # if last_event_while_ago:
+        #    self.workbench_queue.put(None)
 
     def view_info(self):
         raise NotFound()
@@ -55,8 +51,8 @@ class DesktopApp(Flask):
         return render_template('index.html', name='init')
 
 
-
 class WorkbenchThread(Thread):
+
     def __init__(self, queue: Queue):
         super().__init__(daemon=True)
         self.workbench = Workbench()
@@ -68,7 +64,3 @@ class WorkbenchThread(Thread):
             self.queue.get()
             self.snapshot = self.workbench.run()
             # todo upload to devicehub
-
-
-
-
