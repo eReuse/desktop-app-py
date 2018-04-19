@@ -10,13 +10,25 @@ h1 {font-size: 1.5em}
 h2  {font-size: 1.2em; }
 
 iframe {
-    margin-top: 2em;
+    margin-top: 1em;
     margin-bottom: 2em;
-    /* height =  100vh - iframe margin top - h1 */
-    height: calc(100vh - 4em - 1.5em);
+    /* height =  100vh - iframe margin top - h1 - aux*/
+    height: calc(100vh - 4em - 1.5em - 4em);
     width: 100%;
+}
+
+.nav {
+    text-align: end;
 }
 
 #title {
     text-align: center;
 }
+
+/*
+ New features style
+
+#button-wb {
+    margin: 0 auto;
+}
+*/
