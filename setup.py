@@ -12,7 +12,8 @@ setup(
     # Updated in 2017-07-29
     install_requires=[
         'flask>=0.11',
-        'ereuse-utils'
+        'ereuse-utils',
+        'requests',
     ],
     keywords='eReuse.org Workbench devices reuse recycle it asset management',
     test_suite='workbench_server.tests',

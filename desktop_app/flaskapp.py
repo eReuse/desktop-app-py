@@ -1,8 +1,11 @@
 from threading import Thread
+
+import requests
 from ereuse_utils import ensure_utf8
 from ereuse_workbench.workbench import Workbench
 from flask import Flask, render_template, jsonify, json, request, Response
 from multiprocessing import Queue
+
 from werkzeug.exceptions import NotFound
 
 
@@ -24,6 +27,7 @@ class DesktopApp(Flask):
         self.workbench_queue = Queue()
         self.workbench_thread = WorkbenchThread(self.workbench_queue)
         self.workbench_thread.run()
+        # put REST vars Devicehub url,auth,
         # todo get info from devicehub
         # if last event has been a while ago
         # if last_event_while_ago:
@@ -58,9 +62,41 @@ class WorkbenchThread(Thread):
         self.workbench = Workbench()
         self.queue = queue
         self.snapshot = None
+        self.auth = {
+            # credentials to upload DH
+            "email": "desktop-app@ereuse.org",
+            "password": 'XXX',
+        }
+        self.headers = {
+            "Content-Type": "application/json",
+            "Accept": "application/json"
+        }
+        """
+        self.server = Session()
+        self.server.headers.update({'Content-Type': 'application/json'})
+        self.server.headers.update({'Accept': 'application/json'})
+        """
 
     def start(self):
         while True:
             self.queue.get()
             self.snapshot = self.workbench.run()
+            #if workbench is finish:
             # todo upload to devicehub
+            #self.upload_to_devicehub()
+
+    def upload_to_devicehub(self):
+        # POST Login to return info DH
+        url_login = "https://api.devicetag.io/login"
+        payload = self.auth
+        response = requests.request("POST", url_login, data=payload, headers=self.headers)
+
+        # POST Snapshot to DH
+        device_hub = jsonify(response.text).url
+        db = jsonify(response.text).db
+        url = '{}/{}/events/devices/snapshot'.format(device_hub, db)
+        try:
+            r = requests.post(url, json=self.snapshot)
+            r.raise_for_status()
+        except requests.HTTPError as e:
+            print(e.response.content.decode())
