@@ -1,11 +1,11 @@
+import json
+from multiprocessing import Queue
 from threading import Thread
 
 import requests
 from ereuse_utils import ensure_utf8
 from ereuse_workbench.workbench import Workbench
-from flask import Flask, render_template, jsonify, json, request, Response
-from multiprocessing import Queue
-
+from flask import Flask, render_template, jsonify, request, Response
 from werkzeug.exceptions import NotFound
 
 
@@ -24,14 +24,20 @@ class DesktopApp(Flask):
         self.add_url_rule('/', view_func=self.view_default, methods={'GET'})
         self.add_url_rule('/info', view_func=self.view_info, methods={'GET'})
         self.add_url_rule('/workbench', view_func=self.view_workbench, methods={'GET', 'POST'})
+        # todo load env with config values
+        # with open('/path/to/.env_dh.json') as data:
+        #    self.env_dh = json.load(data)
+        #    print(self.env_dh)
+
         self.workbench_queue = Queue()
         self.workbench_thread = WorkbenchThread(self.workbench_queue)
         self.workbench_thread.run()
         # put REST vars Devicehub url,auth,
         # todo get info from devicehub
+        # todo udpate env_dh.json with new info
         # if last event has been a while ago
         # if last_event_while_ago:
-        #    self.workbench_queue.put(None)
+        #  self.workbench_queue.put(None)
 
     def view_info(self):
         raise NotFound()
@@ -62,41 +68,49 @@ class WorkbenchThread(Thread):
         self.workbench = Workbench()
         self.queue = queue
         self.snapshot = None
-        self.auth = {
-            # credentials to upload DH
-            "email": "desktop-app@ereuse.org",
-            "password": 'XXX',
-        }
+        self.url_devicehub = "https://api.devicetag.io"
         self.headers = {
             "Content-Type": "application/json",
             "Accept": "application/json"
         }
-        """
-        self.server = Session()
-        self.server.headers.update({'Content-Type': 'application/json'})
-        self.server.headers.update({'Accept': 'application/json'})
-        """
 
     def start(self):
         while True:
             self.queue.get()
             self.snapshot = self.workbench.run()
-            #if workbench is finish:
+            # if workbench is finish:
             # todo upload to devicehub
-            #self.upload_to_devicehub()
+            #   self.upload_to_devicehub()
 
     def upload_to_devicehub(self):
-        # POST Login to return info DH
-        url_login = "https://api.devicetag.io/login"
-        payload = self.auth
-        response = requests.request("POST", url_login, data=payload, headers=self.headers)
+        # convert json to dict
+        # snapshot_dict = json.loads(self.snapshot)
 
-        # POST Snapshot to DH
-        device_hub = jsonify(response.text).url
-        db = jsonify(response.text).db
-        url = '{}/{}/events/devices/snapshot'.format(device_hub, db)
+        # login devicehub
+        # POST Login to get auth
+        # data_login = config.mailDH + config.pwdDH
+        data_login = {
+            # todo get this values from env_dh_test.json
+            "email": "desktop-app@ereuse.org",
+            "password": 'XXX',
+        }
+        response = requests.post(self.url_devicehub, json=data_login, headers=self.headers)
+
+        # todo get auth from response and push to headers
+        # todo take defaultDatabase from response
+        token = 'Basic ' + response.json()
+
+        # in one line is possible?
+        headers_snapshot = self.headers
+        headers_snapshot.update({'Authorization': token})
+
+        db = response.json()
+
+        # upload snapshot
+        # POST Snapshot to Devicehub
+        url_snapshot = '{}/{}/events/devices/snapshot'.format(self.url_devicehub, db)
         try:
-            r = requests.post(url, json=self.snapshot)
+            r = requests.post(url_snapshot, json=self.snapshot, headers=headers_snapshot)
             r.raise_for_status()
         except requests.HTTPError as e:
             print(e.response.content.decode())
