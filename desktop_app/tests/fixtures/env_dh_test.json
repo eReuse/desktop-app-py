@@ -1,7 +1,8 @@
 {
-  "mailDH":"",
-  "pwdDH":"",
-  "url":"",
-  "version":"",
-  "lastWB": ""
+  "id":"",
+  "url":"https://local.devicetag.io",
+  "db":"db1",
+  "token":"abcd",
+  "version":"0.0.0",
+  "lastWorkbench": "2018-01-05"
 }

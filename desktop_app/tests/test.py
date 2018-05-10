@@ -1,12 +1,17 @@
+from pathlib import Path
+
 import requests
 from flask import json
+from pathlib import Path
+from ereuse_utils.test import Client
 
 
 class TestClass(object):
 
-    def test_post_snapshot(self):
-        """Test to check if works login Devicetag and post snapshot correctly"""
-        self.env = json.loads('env_dh_test.json')
+    def test_workbench_post_snapshot(self):
+        """Test to check if runs workbench and post snapshot correctly"""
+        with Path(__file__).parent.joinpath('fixtures/.env_dh_test.json').open('w') as file:
+            self.config = json.load(file)  # type: dict
 
         # login devicehub
         # POST Login to get auth
@@ -25,15 +30,3 @@ class TestClass(object):
 
         assert {'key': 'value'} in r.data
         assert r.status_code == 200
-
-    def test_workbench(self):
-        x = "hello"
-        assert hasattr(x, 'check')
-
-    def post_json(client, url, json_dict):
-        """Send dictionary json_dict as a json to the specified url """
-        return client.post(url, data=json.dumps(json_dict), content_type='application/json')
-
-    def json_of_response(response):
-        """Decode json from response"""
-        return json.loads(response.data.decode('utf8'))
