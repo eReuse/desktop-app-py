@@ -1,12 +1,15 @@
 import json
 from multiprocessing import Queue
+from pathlib import Path
 from threading import Thread
 
 import requests
-from ereuse_utils import ensure_utf8
+import flask_cors
+from ereuse_utils import ensure_utf8, DeviceHubJSONEncoder
 from ereuse_workbench.workbench import Workbench
 from flask import Flask, render_template, jsonify, request, Response
 from werkzeug.exceptions import NotFound
+from ereuse_utils.test import Client
 
 
 class DesktopApp(Flask):
@@ -14,6 +17,9 @@ class DesktopApp(Flask):
         todo python scheduler per correr periodicament
         todo create icon.desktop
     """
+
+    test_client_class = Client
+    json_encoder = DeviceHubJSONEncoder
 
     def __init__(self, import_name=__name__, static_path=None, static_url_path=None,
                  static_folder='static', template_folder='templates', instance_path=None,
@@ -25,17 +31,32 @@ class DesktopApp(Flask):
         self.add_url_rule('/info', view_func=self.view_info, methods={'GET'})
         self.add_url_rule('/workbench', view_func=self.view_workbench, methods={'GET', 'POST'})
         # todo load env with config values
-        # with open('/path/to/.env_dh.json') as data:
-        #    self.env_dh = json.load(data)
-        #    print(self.env_dh)
+        # noinspection PyUnresolvedReferences
+        with Path(__file__).parent.joinpath('.env_dh.json').open('r') as file:
+            self.env_dh = json.load(file)  # type: dict
+            assert isinstance(self.env_dh, dict)
+
+        # todo get info_config from devicehub
+        # todo udpate env_dh.json with new config
+        self.url_dh = "https://api.devicetag.io"
+
+        # todo if not id in self.config then run wb and get/post snapshot
+        url_info = '{}/desktop-app'.format(self.url_dh)
+        if self.env_dh['id'] == "":
+            snapshot_init = Workbench().run()
+            self.new_config_response = requests.get(url=url_info, data=snapshot_init)
+        else:
+            self.new_config_response = requests.get(url=url_info)
+        self.env_dh = self.new_config_response.json()
+        with Path(__file__).parent.joinpath('.env_dh.json').open('w') as file:
+            json.dump(self.config, file)
 
         self.workbench_queue = Queue()
         self.workbench_thread = WorkbenchThread(self.workbench_queue)
         self.workbench_thread.run()
-        # put REST vars Devicehub url,auth,
-        # todo get info from devicehub
-        # todo udpate env_dh.json with new info
+
         # if last event has been a while ago
+        # take local date and compare with config.lastWorkbench
         # if last_event_while_ago:
         #  self.workbench_queue.put(None)
 
@@ -65,10 +86,11 @@ class WorkbenchThread(Thread):
 
     def __init__(self, queue: Queue):
         super().__init__(daemon=True)
+        self.env_dh = None
         self.workbench = Workbench()
         self.queue = queue
         self.snapshot = None
-        self.url_devicehub = "https://api.devicetag.io"
+        self.url_dh = "https://api.devicetag.io"
         self.headers = {
             "Content-Type": "application/json",
             "Accept": "application/json"
@@ -83,32 +105,21 @@ class WorkbenchThread(Thread):
             #   self.upload_to_devicehub()
 
     def upload_to_devicehub(self):
-        # convert json to dict
-        # snapshot_dict = json.loads(self.snapshot)
 
-        # login devicehub
-        # POST Login to get auth
-        # data_login = config.mailDH + config.pwdDH
-        data_login = {
-            # todo get this values from env_dh_test.json
-            "email": "desktop-app@ereuse.org",
-            "password": 'XXX',
-        }
-        response = requests.post(self.url_devicehub, json=data_login, headers=self.headers)
-
-        # todo get auth from response and push to headers
+        # todo get to DH update env_dh
         # todo take defaultDatabase from response
-        token = 'Basic ' + response.json()
+        token = self.env_dh.get('token')
 
-        # in one line is possible?
-        headers_snapshot = self.headers
+        headers_snapshot = {
+            "Content-Type": "application/json",
+            "Accept": "application/json"
+        }
         headers_snapshot.update({'Authorization': token})
-
-        db = response.json()
+        db = self.env_dh.get
 
         # upload snapshot
         # POST Snapshot to Devicehub
-        url_snapshot = '{}/{}/events/devices/snapshot'.format(self.url_devicehub, db)
+        url_snapshot = '{}/{}/events/devices/snapshot'.format(self.url_dh, db)
         try:
             r = requests.post(url_snapshot, json=self.snapshot, headers=headers_snapshot)
             r.raise_for_status()
