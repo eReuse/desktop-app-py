@@ -7,3 +7,5 @@
 # Local testing
 /worker_app.py
 /web_service_app.py
+
+/desktop_app/.env_dh.json
