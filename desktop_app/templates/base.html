@@ -5,15 +5,7 @@
         <meta charset="UTF-8">
         <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" >
         <script src="{{ url_for('static', filename='jquery-3.3.1.min.js') }}" > </script>
-        <script>
-            $.ajax({
-                url: "/devicehub",
-                method: "POST",
-                data: JSON.stringify(snapshot),
-                dataType: 'json',
-                contentType: "application/json"
-            });
-        </script>
+        <script src="{{ url_for('static', filename='script.js') }}"> </script>
         <title> eReuse.org Support & Info </title>
     {% endblock %}
 </head>
@@ -24,7 +16,7 @@
     {% block navbar %}
             <!--Nav bar -->
         <div class="nav">
-            <button id="button-wb" action="/workbench"> Workbench </button>
+            <a href="#" onclick="wb()"> <button type="button">Workbench</button> </a>
         </div>
     {% endblock %}
     {% block content %} {% endblock %}
