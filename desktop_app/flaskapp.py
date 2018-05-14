@@ -1,15 +1,16 @@
 import json
+from datetime import datetime, timedelta
 from multiprocessing import Queue
 from pathlib import Path
 from threading import Thread
 
 import requests
-import flask_cors
+from dateutil.parser import parse
 from ereuse_utils import ensure_utf8, DeviceHubJSONEncoder
+from ereuse_utils.test import Client
 from ereuse_workbench.workbench import Workbench
 from flask import Flask, render_template, jsonify, request, Response
 from werkzeug.exceptions import NotFound
-from ereuse_utils.test import Client
 
 
 class DesktopApp(Flask):
@@ -30,17 +31,15 @@ class DesktopApp(Flask):
         self.add_url_rule('/', view_func=self.view_default, methods={'GET'})
         self.add_url_rule('/info', view_func=self.view_info, methods={'GET'})
         self.add_url_rule('/workbench', view_func=self.view_workbench, methods={'GET', 'POST'})
-        # todo load env with config values
+        # load env with config values
         # noinspection PyUnresolvedReferences
         with Path(__file__).parent.joinpath('.env_dh.json').open('r') as file:
             self.env_dh = json.load(file)  # type: dict
             assert isinstance(self.env_dh, dict)
 
-        # todo get info_config from devicehub
-        # todo udpate env_dh.json with new config
         self.url_dh = "https://api.devicetag.io"
 
-        # todo if not id in self.config then run wb and get/post snapshot
+        # check if it has id
         url_info = '{}/desktop-app'.format(self.url_dh)
         if self.env_dh['id'] == "":
             snapshot_init = Workbench().run()
@@ -49,28 +48,31 @@ class DesktopApp(Flask):
             self.new_config_response = requests.get(url=url_info)
         self.env_dh = self.new_config_response.json()
         with Path(__file__).parent.joinpath('.env_dh.json').open('w') as file:
-            json.dump(self.config, file)
+            json.dump(self.env_dh, file)
 
         self.workbench_queue = Queue()
         self.workbench_thread = WorkbenchThread(self.workbench_queue)
         self.workbench_thread.run()
 
-        # if last event has been a while ago
-        # take local date and compare with config.lastWorkbench
-        # if last_event_while_ago:
-        #  self.workbench_queue.put(None)
+        last_snapshot = parse(self.env_dh['lastWorkbench']) # type: datetime
+        days_between_snapshots = timedelta(days=self.env_dh['daysBetweenSnapshots'])
+
+        # compare diff between dates and start wb process
+        if (datetime.now() - last_snapshot) >= days_between_snapshots:
+            self.workbench_queue.put(None)
 
     def view_info(self):
         raise NotFound()
 
     def view_workbench(self):
-        """Execute workbench manually and returns the result.
+        """Execute workbench manually and returns snapshot to DH.
             Need to be root user
         """
+        # POST put execution wb in queue
         if request.method == 'POST':
             self.workbench_queue.put(None)
             return Response(status=200)
-        else:  # GET
+        else:  # GET show json snapshot when finish wb process while 102 processing
             snapshot = self.workbench_thread.snapshot
             if snapshot is None:
                 return Response(status=102)
@@ -83,7 +85,6 @@ class DesktopApp(Flask):
 
 
 class WorkbenchThread(Thread):
-
     def __init__(self, queue: Queue):
         super().__init__(daemon=True)
         self.env_dh = None
@@ -99,25 +100,17 @@ class WorkbenchThread(Thread):
     def start(self):
         while True:
             self.queue.get()
+            self.snapshot = None
             self.snapshot = self.workbench.run()
-            # if workbench is finish:
-            # todo upload to devicehub
-            #   self.upload_to_devicehub()
+            self.upload_to_devicehub()
 
     def upload_to_devicehub(self):
+        token = self.env_dh['token']
 
-        # todo get to DH update env_dh
-        # todo take defaultDatabase from response
-        token = self.env_dh.get('token')
-
-        headers_snapshot = {
-            "Content-Type": "application/json",
-            "Accept": "application/json"
-        }
+        headers_snapshot = self.headers
         headers_snapshot.update({'Authorization': token})
-        db = self.env_dh.get
+        db = self.env_dh['db']
 
-        # upload snapshot
         # POST Snapshot to Devicehub
         url_snapshot = '{}/{}/events/devices/snapshot'.format(self.url_dh, db)
         try:
