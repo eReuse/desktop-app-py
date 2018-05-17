@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-INSTALL_DIR="/dir/to/install/project"
+INSTALL_DIR="/opt"
 
 echo "[Unit]
 Description=Start DesktopApp service
