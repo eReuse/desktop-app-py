@@ -3,10 +3,6 @@
     {{ super() }}
 {% endblock %}
 {% block content %}
-    {% for mainkey in data %}
-    <h1>{{ mainkey }}</h1>
-    {% for key, value in data[mainkey].items() %}
-    <p><strong>{{ key }}</strong><span>{{ value }}</span></p>
-    {% endfor %}
-    {% endfor %}
+    <!-- show pretty snapshot or show some information about device health-->
+{% endblock %}
 {% endblock %}
