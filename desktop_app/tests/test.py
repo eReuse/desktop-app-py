@@ -20,13 +20,11 @@ def file(name: str) -> dict:
 @pytest.fixture()
 def mock_snapshot_post(request_mock: Mocker) -> (dict, dict, Mocker):
     """
-    Mocks uploading to snapshot (login and upload).
-    You will need to POST to /login with returned params.
+    Mocks uploading to snapshot (get info and upload).
+    You will need to POST to /desktop-app and return info.
     """
-    params = {
-        'device-hub': 'https://foo.com',
-        'db': 'db-foo'
-    }
+
+    id_test = 0
 
     # take token from env_dh_test
     headers = {AUTH: BASIC.format('FooToken')}
@@ -34,7 +32,7 @@ def mock_snapshot_post(request_mock: Mocker) -> (dict, dict, Mocker):
                       json={'_id': 'new-snapshot-id'},
                       request_headers=headers)
 
-    return params, headers, request_mock
+    return id_test, headers, request_mock
 
 
 @pytest.fixture()
@@ -102,8 +100,12 @@ def test_full(workbench: MagicMock, client: Client, mock_snapshot_post: (dict, d
     sleep(1)
 
     # POST Snapshot to Devicehub
-    env_test = file('env_dh_test')
-    url_snapshot = '{}/{}/events/devices/snapshot'.format(env_test[url], env_test[db])
+    # POST to /desktop-app
+    info = client.post(uri='/desktop-app', data=snapshot, status=200)
+
+    # env_test = file('env_dh_test')
+    # url_snapshot = '{}/{}/events/devices/snapshot'.format(env_test[url], env_test[db])
+    url_snapshot = 'https://foo.com/db-foo/events/devices/snapshot'
     response = client.post(uri=url_snapshot, data=snapshot, status=200)
     # checks to be sure all test works correctly
     assert response.status_code == 200
