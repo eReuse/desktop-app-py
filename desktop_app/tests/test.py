@@ -18,21 +18,32 @@ def file(name: str) -> dict:
 
 
 @pytest.fixture()
-def mock_snapshot_post(request_mock: Mocker) -> (dict, dict, Mocker):
+def mock_requests_snapshot(request_mock: Mocker) -> (dict, Mocker):
     """
     Mocks uploading to snapshot (get info and upload).
-    You will need to POST to /desktop-app and return info.
+    GET to /desktop-app with snapshot data and return info.
+    POST to /events/devices/snapshot to upload snapshot to DH
     """
+    # open env file
+    env_test = file('env_dh_test')
+    uri_post = '{}/{}/events/devices/snapshot'.format(env_test['url'], env_test['db'])
 
-    id_test = 0
+    headers = {
+        "Content-Type": "application/json",
+        "Accept": "application/json"
+    }
+    headers_snapshot = headers.update({AUTH: BASIC.format(env_test['token'])})
 
-    # take token from env_dh_test
-    headers = {AUTH: BASIC.format('FooToken')}
-    request_mock.post('https://foo.com/db-foo/events/devices/snapshot',
+    request_mock.post(uri_post,
                       json={'_id': 'new-snapshot-id'},
-                      request_headers=headers)
+                      request_headers=headers_snapshot)
 
-    return id_test, headers, request_mock
+    # GET Request Matching
+    request_mock.register_uri('GET', 'https://api.devicetag.io/desktop-app',
+                              request_headers=headers,
+                              data=env_test)
+
+    return headers, request_mock
 
 
 @pytest.fixture()
@@ -63,11 +74,13 @@ def client(app: DesktopApp):
 
 
 def test_upload_snapshot_devicehub(client: Client):
-    # open snapshot file
+    # Open snapshot file
     env_test = file('env_dh_test')
-    url_snapshot = '{}/{}/events/devices/snapshot'.format(env_test[url], env_test[db])
+    snapshot = file('snapshot_test')
+    url_snapshot = '{}/{}/events/devices/snapshot'.format(env_test['url'], env_test['db'])
     response = client.post(uri=url_snapshot, data=snapshot, status=200)
 
+    # Only check status code?
     assert response.status_code == 200
 
 
@@ -77,35 +90,64 @@ def test_upload_wrong_snapshot_devicehub():
 
 def test_upload_snapshot_devicehub_wrong_connection():
     wt = WorkbenchThread(Queue())
-    wt.snapshot = mock_snapshot_post  # mock snapshot
+    wt.snapshot = mock_requests_snapshot  # mock snapshot
     wt.upload_to_devicehub()
 
 
-def test_auto_workbench():
+def test_auto_workbench(workbench: MagicMock, client: Client):
     """Checks that workbench auto-executes when has passed more than X days since the last one."""
+    # open env file
+    env_test = file('env_dh_test')
 
     # simulate daysBetweenSnapshots and checks it
-    # if (now() - last_snapshot) >= days_between_snapshots:
-    #   execute wb
+    # if (datetime.now() - env_test['lastSnapshot']) >= env_test['daysBetweenSnapshots']:
+    #   snapshot, _ = client.get(uri='/workbench', status=200)
     sleep(1)
+    #assert snapshot is correct
     pass
 
 
-def test_full(workbench: MagicMock, client: Client, mock_snapshot_post: (dict, dict, Mocker)):
+def test_init_with_id(workbench: MagicMock, client: Client, mock_requests_snapshot: (dict, Mocker)):
     """Test to check if runs workbench and post snapshot correctly"""
     workbench.side_effect.snapshot_path = 'snapshot_test'
+    headers, mocked_snapshot = mock_requests_snapshot
     assert workbench.call_count == 0
+    assert mocked_snapshot.call_count == 0
+
     # execute workbench
     snapshot, _ = client.get(uri='/workbench', status=200)
     sleep(1)
 
-    # POST Snapshot to Devicehub
-    # POST to /desktop-app
-    info = client.post(uri='/desktop-app', data=snapshot, status=200)
+    # open env file and get post params
+    env_test = file('env_dh_test')
+    url_snapshot = '{}/{}/events/devices/snapshot'.format(env_test['url'], env_test['db'])
+    headers_snapshot = headers.update({AUTH: BASIC.format(env_test['token'])})
 
-    # env_test = file('env_dh_test')
-    # url_snapshot = '{}/{}/events/devices/snapshot'.format(env_test[url], env_test[db])
-    url_snapshot = 'https://foo.com/db-foo/events/devices/snapshot'
-    response = client.post(uri=url_snapshot, data=snapshot, status=200)
-    # checks to be sure all test works correctly
+    assert workbench.call_count == 1
+
+    # POST snapshot to Devicehub
+    response = client.post(uri=url_snapshot, data=snapshot, headers=headers_snapshot, status=200)
+
+    assert mocked_snapshot.call_count == 1
     assert response.status_code == 200
+
+
+def test_init_without_id(workbench: MagicMock, client: Client, mock_requests_snapshot: (dict, Mocker)):
+    """Test to check if runs workbench and post snapshot correctly"""
+    workbench.side_effect.snapshot_path = 'snapshot_test'
+    headers, mocked_snapshot = mock_requests_snapshot
+    assert workbench.call_count == 0
+    assert mocked_snapshot.call_count == 0
+
+    # execute workbench
+    snapshot, _ = client.get(uri='/workbench', status=200)
+    sleep(1)
+
+    assert workbench.call_count == 1
+
+    # GET to /desktop-app with snapshot data to return id
+    r = client.post(uri='/desktop-app', data=snapshot, status=200)
+
+    assert mocked_snapshot.call_count == 1
+    assert r.status_code == 200
+    assert r.text['id'] != ""
