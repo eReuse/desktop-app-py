@@ -1,0 +1,9 @@
+{
+  "id":"1",
+  "url":"https://api.devicetag.io",
+  "db":"db1",
+  "token":"abcd",
+  "version":"0.0.0",
+  "lastSnapshot": "2018-01-05",
+  "daysBetweenSnapshots": 10
+}
