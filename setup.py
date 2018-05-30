@@ -14,7 +14,8 @@ setup(
         'flask>=0.11',
         'ereuse-utils [test]',
         'requests',
-        'flask-cors'
+        'flask-cors',
+        'dateutil'
     ],
     keywords='eReuse.org Workbench devices reuse recycle it asset management',
     test_suite='workbench_server.tests',
