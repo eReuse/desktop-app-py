@@ -57,8 +57,7 @@ class DesktopApp(Flask):
         with Path(__file__).parent.joinpath('.env_dh.json').open('w') as file:
             json.dump(self.env_dh, file)
 
-        self.workbench_queue = Queue()
-        self.workbench_thread = WorkbenchThread(self.workbench_queue)
+        self.workbench_thread = WorkbenchThread()
         self.workbench_thread.run()
 
         last_snapshot = parse(self.env_dh['lastSnapshot'])  # type: datetime
@@ -66,15 +65,25 @@ class DesktopApp(Flask):
 
         # compare diff between dates and start wb process
         if (datetime.now() - last_snapshot) >= days_between_snapshots:
-            self.workbench_queue.put(None)
+            self.workbench_thread.execute_workbench()
 
     def view_workbench(self):
-        """Execute workbench manually and returns snapshot to DH.
-            Need to be root user
+        """
+        Manage Workbench execution.
+
+        When performing POST executes the Workbench. This method does
+        not return anything; to get the resulting Snapshot execute
+        GET.
+
+        When performing GET gets, either:
+
+        - The resulting Snapshot if the Workbench has finished execution.
+        - A ``HTTP 102 Processing`` if the execution of the Workbench
+          has not finished yet.
         """
         # POST put execution wb in queue
         if request.method == 'POST':
-            self.workbench_queue.put(None)
+            self.workbench_thread.execute_workbench()
             return Response(status=200)
         else:  # GET show json snapshot when finish wb process while 102 processing
             snapshot = self.workbench_thread.snapshot
@@ -89,26 +98,35 @@ class DesktopApp(Flask):
 
 
 class WorkbenchThread(Thread):
-    def __init__(self, queue: Queue):
+    def __init__(self):
+        # This executes in main thread
         super().__init__(daemon=True)
         self.env_dh = None
         self.workbench = Workbench()
-        self.queue = queue
+        self.queue = Queue()
         self.snapshot = None
+        self.response = None
         self.url_dh = "https://api.devicetag.io"
         self.headers = {
             "Content-Type": "application/json",
             "Accept": "application/json"
         }
 
+    def execute_workbench(self):
+        """Execute the workbench in the other thread."""
+        # This executes in main thread
+        self.queue.put(None)  # Awakes slave thread so it can execute workbench
+
     def start(self):
+        # This executes in slave thread
         while True:
-            self.queue.get()
+            self.queue.get()  # sleep waiting for a queue.put() from main thread
             self.snapshot = None
             self.snapshot = self.workbench.run()
             self.upload_to_devicehub()
 
     def upload_to_devicehub(self):
+        """POST to DeviceHub with snapshot data"""
         token = self.env_dh['token']
 
         headers_snapshot = self.headers
@@ -118,7 +136,7 @@ class WorkbenchThread(Thread):
         # POST Snapshot to Devicehub
         url_snapshot = '{}/{}/events/devices/snapshot'.format(self.url_dh, db)
         try:
-            r = requests.post(url_snapshot, json=self.snapshot, headers=headers_snapshot)
-            r.raise_for_status()
+            self.response = requests.post(url_snapshot, json=self.snapshot, headers=headers_snapshot)
+            self.response.raise_for_status()
         except requests.HTTPError as e:
             print(e.response.content.decode())
